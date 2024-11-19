@@ -3,13 +3,13 @@ on:
   workflow_dispatch:
 
 env:
-  REPO_URL: https://github.com/benboguan/immortalwrt-mt798x
+  REPO_URL: https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: mt798x-scripts
-  FEEDS_CONF_FILE: h3c-nx30pro/benboguan-immortalwrt/feeds.conf.default
-  CONFIG_FILE: h3c-nx30pro/benboguan-immortalwrt/.config
-  MOD_PART1_SH: h3c-nx30pro/benboguan-immortalwrt/part1.sh
-  MOD_PART2_SH: h3c-nx30pro/benboguan-immortalwrt/part2.sh
-  MOD_PART3_SH: h3c-nx30pro/benboguan-immortalwrt/part3.sh
+  FEEDS_CONF_FILE: feeds.conf.default
+  CONFIG_FILE: .config
+  MOD_PART1_SH: part1.sh
+  MOD_PART2_SH: part2.sh
+  MOD_PART3_SH: part3.sh
   UPLOAD_BIN_DIR: false
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
