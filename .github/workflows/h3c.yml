@@ -1,10 +1,11 @@
 name: h3c-nx30pro
+
 on:
   workflow_dispatch:
 
 env:
   REPO_URL: https://github.com/hanwckf/immortalwrt-mt798x
-  REPO_BRANCH: mt798x-scripts
+  REPO_BRANCH: openwrt-21.02
   FEEDS_CONF_FILE: feeds.conf.default
   CONFIG_FILE: .config
   MOD_PART1_SH: part1.sh
@@ -30,7 +31,12 @@ jobs:
       - name: 清理磁盘空间 (Ubuntu)
         uses: jlumbroso/free-disk-space@main
         with:
+          # this might remove tools that are actually needed,
+          # if set to "true" but frees about 6 GB
           tool-cache: false
+
+          # all of these default to true, but feel free to set to
+          # "false" if necessary for your workflow
           android: true
           dotnet: true
           haskell: true
@@ -148,7 +154,7 @@ jobs:
         id: tag
         if: env.UPLOAD_RELEASE == 'true' && !cancelled()
         run: |
-          echo "release_tag=h3c_nx30pro-Benboguan_Immortalwrt-$(date +"%Y%m%d_%H%M")" >> "$GITHUB_OUTPUT"
+          echo "release_tag=h3c_nx30pro-Hanwckf_Immortalwrt-$(date +"%Y%m%d_%H%M")" >> "$GITHUB_OUTPUT"
           touch release.txt
           echo "STATUS=success" >> "$GITHUB_OUTPUT"
 
