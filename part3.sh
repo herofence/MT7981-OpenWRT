@@ -1,3 +1,4 @@
+#参数设置
 echo '修改主机名'
 sed -i "s/hostname='ImmortalWrt'/hostname='NX30PRO'/g" package/base-files/files/bin/config_generate
 cat package/base-files/files/bin/config_generate |grep hostname=
