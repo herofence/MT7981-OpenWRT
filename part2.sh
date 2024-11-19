@@ -1,3 +1,4 @@
+#替换源
 echo '替换jerrykuku的luci argon主题'
 rm -rf feeds/luci/themes/luci-theme-argon
 git clone -b master --single-branch https://github.com/jerrykuku/luci-theme-argon feeds/luci/themes/luci-theme-argon
