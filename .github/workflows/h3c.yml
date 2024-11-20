@@ -132,6 +132,7 @@ jobs:
         if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
         run: |
           cd openwrt
+          ls -la
           find . -type d
           cd openwrt/bin/targets/*/*
           rm -rf packages
