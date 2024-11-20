@@ -6,7 +6,6 @@ on:
 env:
   REPO_URL: https://github.com/hanwckf/immortalwrt-mt798x
   REPO_BRANCH: openwrt-21.02
-  FEEDS_CONF_FILE: feeds.conf.default
   CONFIG_FILE: .config
   MOD_PART1_SH: part1.sh
   MOD_PART2_SH: part2.sh
@@ -71,7 +70,7 @@ jobs:
 
       - name: 加载自定义feeds文件并执行Part1
         run: |
-          [ -e $FEEDS_CONF_FILE ] && mv $FEEDS_CONF_FILE openwrt/feeds.conf.default
+          [ -e files ] && mv files openwrt/files
           chmod +x $MOD_PART1_SH
           cd openwrt
           $GITHUB_WORKSPACE/$MOD_PART1_SH
