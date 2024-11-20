@@ -29,11 +29,3 @@ sed -i "s/time1.google.com/ntp.tencent.com/g" package/base-files/files/bin/confi
 sed -i "s/time.cloudflare.com/time.ustc.edu.cn/g" package/base-files/files/bin/config_generate
 sed -i "s/pool.ntp.org/cn.pool.ntp.org/g" package/base-files/files/bin/config_generate
 echo '=========Alert NTP Server OK!========='
-echo '修改闭源驱动2G wifi名称'
-sed -i 's/ssid="ImmortalWrt-2.4G"/ssid="herofence-2.4G"/g' package/mtk/applications/mtwifi-cfg/files/mtwifi.sh
-sed -i 's/ssid="OpenWRT-2.4G/ssid="herofence-2.4G/g' package/mtk/drivers/wifi-profile/files/common/mt7981/lib/wifi/mtk.sh
-echo '=========Alert 2.4G wifi name OK!========='
-echo '修改闭源驱动5G wifi名称'
-sed -i 's/ssid="ImmortalWrt-5G"/ssid="herofence-5G"/g' package/mtk/applications/mtwifi-cfg/files/mtwifi.sh
-sed -i 's/ssid="OpenWRT-5G/ssid="herofence-5G/g' package/mtk/drivers/wifi-profile/files/common/mt7981/lib/wifi/mtk.sh
-echo '=========Alert 5G wifi name OK!========='
