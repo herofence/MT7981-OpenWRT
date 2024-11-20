@@ -2,186 +2,180 @@ name: h3c-nx30pro
 
 on:
   workflow_dispatch:
-  schedule:
-  # 每周五 5:00执行一次
-    - cron: 0 21 * * THU
 
 env:
   REPO_URL: https://github.com/hanwckf/immortalwrt-mt798x
   REPO_BRANCH: openwrt-21.02
+  FEEDS_CONF_FILE: feeds.conf.default
   CONFIG_FILE: .config
-  DIY_SCRIPT: part.sh
-  CACHE_TOOLCHAIN: true
+  MOD_PART1_SH: part1.sh
+  MOD_PART2_SH: part2.sh
+  MOD_PART3_SH: part3.sh
   UPLOAD_BIN_DIR: false
-  FIRMWARE_RELEASE: true
-  TZ: Asia/Shanghai
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+  UPLOAD_FIRMWARE: true
+  UPLOAD_RELEASE: true
+  TIME_ZONE: Asia/Shanghai
+  COMPILE_DEPENDS: ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential
+    bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib
+    git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev
+    libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev
+    libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf python2.7 python3
+    python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo
+    uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
 jobs:
-  Build:
-    runs-on: ubuntu-22.04
+  build:
+    name: 编译H3C NX30Pro固件
+    runs-on: ubuntu-20.04
 
     steps:
-    - name: 检查服务器性能
-      run: |
-        echo "警告?"
-        echo "分配的服务器性能有限，若选择的插件过多，务必注意CPU性能！"
-        echo -e "已知CPU型号(降序): 7763，8370C，8272CL，8171M，E5-2673\n"
-        echo "--------------------------CPU信息--------------------------"
-        echo "CPU物理数量: $(cat /proc/cpuinfo | grep "physical id" | sort | uniq | wc -l)"
-        echo "CPU核心数量: $(nproc)"
-        echo -e "CPU型号信息:$(cat /proc/cpuinfo | grep -m1 name | awk -F: '{print $2}')\n"
-        echo "--------------------------内存信息--------------------------"
-        echo "已安装内存详细信息:"
-        echo -e "$(sudo lshw -short -C memory | grep GiB)\n"
-        echo "--------------------------硬盘信息--------------------------"
-        echo "硬盘数量: $(ls /dev/sd* | grep -v [1-9] | wc -l)" && df -hT
+      - name: 清理磁盘空间 (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: true
 
-    - name: 初始化环境
-      env:
-        DEBIAN_FRONTEND: noninteractive
-      run: |
-        docker rmi $(docker images -q)
-        sudo rm -rf /usr/share/dotnet /etc/apt/sources.list.d /usr/local/lib/android $AGENT_TOOLSDIRECTORY
-        sudo -E apt-get -y purge azure-cli ghc* zulu* llvm* firefox google* dotnet* powershell openjdk* mongodb* moby* || true
-        sudo -E apt-get -y update
-        sudo -E apt-get -y install $(curl -fsSL is.gd/depends_ubuntu_2204)
-        sudo -E systemctl daemon-reload
-        sudo -E apt-get -y autoremove --purge
-        sudo -E apt-get -y clean
-        sudo timedatectl set-timezone "$TZ"
+      - name: 签出
+        uses: actions/checkout@v4
 
-    - name: 容量设置
-      uses: easimon/maximize-build-space@master
-      with:
-        swap-size-mb: 1024
-        temp-reserve-mb: 100
-        root-reserve-mb: 1024
+      - name: 初始化编译环境
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo rm -rf /etc/apt/sources.list.d/*
+          sudo -E apt-get -qq update
+          sudo -E apt-get -qq full-upgrade -y
+          sudo -E apt-get -qq install -y $COMPILE_DEPENDS
+          sudo -E apt-get -qq --purge autoremove
+          sudo -E apt-get -qq autoclean
+          sudo timedatectl set-timezone "$TIME_ZONE"
+          sudo mkdir -p /workdir
+          sudo chown $USER:$GROUPS /workdir
 
-    - name: 检查
-      uses: actions/checkout@main
+      - name: 拉取源代码
+        working-directory: /workdir
+        run: |
+          df -hT $PWD
+          git clone -b $REPO_BRANCH --single-branch $REPO_URL openwrt
+          ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-    - name: 复制源代码
-      run: |
-        df -hT $GITHUB_WORKSPACE
-        git clone $REPO_URL -b $REPO_BRANCH openwrt
-        cd openwrt
-        echo "OPENWRT_PATH=$PWD" >> $GITHUB_ENV
-        COMMIT_AUTHOR=$(git show -s --date=short --format="作者: %an")
-        echo "COMMIT_AUTHOR=$COMMIT_AUTHOR" >> $GITHUB_ENV
-        COMMIT_DATE=$(git show -s --date=short --format="时间: %ci")
-        echo "COMMIT_DATE=$COMMIT_DATE" >> $GITHUB_ENV
-        COMMIT_MESSAGE=$(git show -s --date=short --format="内容: %s")
-        echo "COMMIT_MESSAGE=$COMMIT_MESSAGE" >> $GITHUB_ENV
-        COMMIT_HASH=$(git show -s --date=short --format="hash: %H")
-        echo "COMMIT_HASH=$COMMIT_HASH" >> $GITHUB_ENV
+      - name: 尝试获取缓存
+        uses: stupidloud/cachewrtbuild@main
+        with:
+          ccache: 'true'
+          mixkey: 'mt7981'
+          prefix: ${{ github.workspace }}/openwrt
 
-    - name: 参数配置
-      run: |
-        cp $CONFIG_FILE $OPENWRT_PATH/.config
-        cd $OPENWRT_PATH
-        make defconfig > /dev/null 2>&1
-        SOURCE_REPO="$(echo $REPO_URL | awk -F '/' '{print $(NF)}')"
-        echo "SOURCE_REPO=$SOURCE_REPO" >> $GITHUB_ENV
-        DEVICE_TARGET=$(cat .config | grep CONFIG_TARGET_BOARD | awk -F '"' '{print $2}')
-        echo "DEVICE_TARGET=$DEVICE_TARGET" >> $GITHUB_ENV
-        DEVICE_SUBTARGET=$(cat .config | grep CONFIG_TARGET_SUBTARGET | awk -F '"' '{print $2}')
-        echo "DEVICE_SUBTARGET=$DEVICE_SUBTARGET" >> $GITHUB_ENV
+      - name: 加载自定义feeds文件并执行Part1
+        run: |
+          [ -e $FEEDS_CONF_FILE ] && mv $FEEDS_CONF_FILE openwrt/feeds.conf.default
+          chmod +x $MOD_PART1_SH
+          cd openwrt
+          $GITHUB_WORKSPACE/$MOD_PART1_SH
 
-    - name: 缓存设置
-      if: env.CACHE_TOOLCHAIN == 'true'
-      uses: HiGarfield/cachewrtbuild@main
-      with:
-        ccache: false
-        mixkey: ${{ env.SOURCE_REPO }}-${{ env.REPO_BRANCH }}-${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}
-        prefix: ${{ env.OPENWRT_PATH }}
+      - name: 更新feeds并执行Part2
+        run: |
+          cd openwrt && ./scripts/feeds update -a
+          cd ..
+          chmod +x $MOD_PART2_SH
+          cd openwrt
+          $GITHUB_WORKSPACE/$MOD_PART2_SH
 
-    - name: 安装源
-      run: |
-        cd $OPENWRT_PATH
-        ./scripts/feeds update -a
-        ./scripts/feeds install -a
+      - name: 安装feeds并执行Part3
+        run: |
+          cd openwrt && ./scripts/feeds install -a
+          cd ..
+          chmod +x $MOD_PART3_SH
+          cd openwrt
+          $GITHUB_WORKSPACE/$MOD_PART3_SH
 
-    - name: 加载自定义配置
-      run: |
-        [ -e files ] && mv files $OPENWRT_PATH/files
-        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE $OPENWRT_PATH/.config
-        chmod +x $GITHUB_WORKSPACE/*.sh
-        chmod +x $DIY_SCRIPT
-        cd $OPENWRT_PATH
-        $GITHUB_WORKSPACE/$DIY_SCRIPT
+      - name: 加载自定义.config文件
+        run: |
+          [ -e files ] && mv files openwrt/files
+          [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
 
-    - name: 下载配件包
-      run: |
-        cd $OPENWRT_PATH
-        make defconfig
-        make download -j8
-        find dl -size -1024c -exec ls -l {} \;
-        find dl -size -1024c -exec rm -f {} \;
+      - name: 下载编译依赖文件
+        id: package
+        run: |
+          cd openwrt
+          make defconfig
+          make download -j8
+          find dl -size -1024c -exec ls -l {} \;
+          find dl -size -1024c -exec rm -f {} \;
 
-    - name: 编译固件
-      id: compile
-      run: |
-        cd $OPENWRT_PATH
-        mkdir -p files/etc/uci-defaults
-        echo -e "$(nproc) thread compile"
-        make -j$(nproc) || make -j1 || make -j1 V=s
-        echo "status=success" >> $GITHUB_OUTPUT
-        echo "DATE=$(date +"%Y-%m-%d %H:%M:%S")" >> $GITHUB_ENV
-        echo "FILE_DATE=$(date +"%Y.%m.%d")" >> $GITHUB_ENV
+      - name: 编译固件
+        id: compile
+        run: |
+          cd openwrt
+          echo -e "$(nproc) thread compile"
+          make -j$(nproc) || make -j1 || make -j1 V=s
+          echo "STATUS=success" >> "$GITHUB_OUTPUT"
+          grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
+          [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
+          echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
-    - name: 检查使用空间
-      if: (!cancelled())
-      run: df -hT
+      - name: 检查磁盘空间
+        if: (!cancelled())
+        run: df -hT
 
-    - name: 上传BIN目录
-      if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
-      uses: actions/upload-artifact@main
-      with:
-        name: ${{ env.SOURCE_REPO }}-bin-${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}-${{ env.FILE_DATE }}
-        path: $OPENWRT_PATH/bin
-        
-    - name: 整理文件
-      id: organize
-      if: steps.compile.outputs.status == 'success'
-      run: |
-        cd $OPENWRT_PATH/bin/targets/*/*
-        cat sha256sums
-        cp $OPENWRT_PATH/.config build.config
-        cd $OPENWRT_PATH/bin/targets/*/*
-        rm -rf packages
-        find . -type f ! -name "*.bin" -exec rm {} +
-        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+      - name: 上传bin目录
+        uses: actions/upload-artifact@main
+        if: steps.compile.outputs.STATUS == 'success' && env.UPLOAD_BIN_DIR == 'true'
+        with:
+          name: Immortalwrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+          path: openwrt/bin
 
-    - name: 上传固件目录
-      if: steps.compile.outputs.status == 'success' && env.FIRMWARE_RELEASE != 'true'
-      uses: actions/upload-artifact@main
-      with:
-        name: ${{ env.SOURCE_REPO }}-firmware-${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}-${{ env.FILE_DATE }}
-        path: ${{ env.FIRMWARE_PATH }}
+      - name: 整理文件
+        id: organize
+        if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
+        run: |
+          cd openwrt/bin/targets/*/*
+          rm -rf packages
+          find . -type f ! -name "*.bin" -exec rm {} +
+          echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+          echo "STATUS=success" >> "$GITHUB_OUTPUT"
 
-    - name: 发布固件
-      uses: softprops/action-gh-release@master
-      with:
-        tag_name: h3c-nx30pro_${{ env.FILE_DATE }}
-        files: ${{ env.FIRMWARE_PATH }}/*
-        body: |
-          包含Zerotier、Lucky
+      - name: 上传固件目录
+        uses: actions/upload-artifact@main
+        if: steps.organize.outputs.STATUS == 'success' && !cancelled()
+        with:
+          name: Immortalwrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+          path: ${{ env.FIRMWARE }}
 
-          ### 📒 固件信息
-          - 💻 平台架构: ${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}
-          - ⚽ 固件源码: ${{ env.REPO_URL }}
-          - 💝 源码分支: ${{ env.REPO_BRANCH }}
-          - 🚀 内核版本: ${{ env.KERNEL }}
-          - 🌐 默认地址: 192.168.2.1
-          - 🔑 默认密码: password
-          ### 🧊 固件版本
-          - 固件编译前最后一次➦[主源码](${{ env.REPO_URL }})更新记录
-          - ${{ env.COMMIT_DATE }}
-          - ${{ env.COMMIT_MESSAGE }}
-          - ${{ env.COMMIT_HASH }}
-          
-    - name: 删除旧版本
-      uses: dev-drprasad/delete-older-releases@v0.3.3
-      with:
-        keep_latest: 10
+      - name: 生成Release标签
+        id: tag
+        if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+        run: |
+          echo "release_tag=h3c_nx30pro-Hanwckf_Immortalwrt-$(date +"%Y%m%d_%H%M")" >> "$GITHUB_OUTPUT"
+          touch release.txt
+          echo "STATUS=success" >> "$GITHUB_OUTPUT"
+
+      - name: 发布到Release
+        uses: softprops/action-gh-release@v2
+        if: steps.tag.outputs.STATUS == 'success' && !cancelled()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.tag.outputs.release_tag }}
+          body_path: release.txt
+          files: ${{ env.FIRMWARE }}/*
+
+      - name: 移除过时Release
+        uses: dev-drprasad/delete-older-releases@master
+        if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          keep_latest: 7
+          delete_tags: true
+
+      - name: 清理过时工作流
+        uses: Mattraks/delete-workflow-runs@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          retain_days: 1
+          keep_minimum_runs: 3
