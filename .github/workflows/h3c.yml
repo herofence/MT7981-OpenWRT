@@ -139,7 +139,7 @@ jobs:
       uses: actions/upload-artifact@main
       with:
         name: ${{ env.SOURCE_REPO }}-bin-${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}-${{ env.FILE_DATE }}
-        path: openwrt/bin
+        path: $OPENWRT_PATH/bin
         
     - name: 整理文件
       id: organize
@@ -148,7 +148,7 @@ jobs:
         cd $OPENWRT_PATH/bin/targets/*/*
         cat sha256sums
         cp $OPENWRT_PATH/.config build.config
-        cd openwrt/bin/targets/*/*
+        cd $OPENWRT_PATH/bin/targets/*/*
         rm -rf packages
         tar -zcf Packages.tar.gz packages
         find . -type f ! -name "*.bin" -exec rm {} +
