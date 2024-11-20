@@ -160,8 +160,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.tag.outputs.release_tag }}
-          body_path: release.txt
           files: ${{ env.FIRMWARE }}/*
+          body: |
+            包含Zerotier、Lucky
 
       - name: 移除过时Release
         uses: dev-drprasad/delete-older-releases@master
