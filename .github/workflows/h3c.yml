@@ -134,7 +134,7 @@ jobs:
       if: (!cancelled())
       run: df -hT
 
-    - name: 文件整理
+    - name: 上传BIN目录
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
       uses: actions/upload-artifact@main
       with:
