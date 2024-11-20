@@ -163,7 +163,7 @@ jobs:
     - name: 发布固件
       uses: softprops/action-gh-release@master
       with:
-        tag_name: openwrt_X86-X64_${{ env.FILE_DATE }}
+        tag_name: h3c-nx30pro_${{ env.FILE_DATE }}
         files: ${{ env.FIRMWARE_PATH }}/*
         body: |
           包含Zerotier、Lucky
