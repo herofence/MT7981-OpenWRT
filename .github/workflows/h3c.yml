@@ -150,7 +150,6 @@ jobs:
         cp $OPENWRT_PATH/.config build.config
         cd $OPENWRT_PATH/bin/targets/*/*
         rm -rf packages
-        tar -zcf Packages.tar.gz packages
         find . -type f ! -name "*.bin" -exec rm {} +
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
 
